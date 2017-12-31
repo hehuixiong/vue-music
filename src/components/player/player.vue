@@ -1,16 +1,82 @@
 <template>
   <div class="player">
     <div class="normal-player" v-show="fullScreen">
-      播放器
+      <div class="background">
+        <img width="100%" height="100%" :src="currentSong.image">
+      </div>
+      <div class="top">
+        <!-- 左上角按钮 -->
+        <div class="back" @click="back">
+          <i class="icon-back"></i>
+        </div>
+        <h1 class="title" v-html="currentSong.name"></h1>
+        <h2 class="subtitle" v-html="currentSong.singer"></h2>
+      </div>
+      <!-- 唱片 -->
+      <div class="middle">
+        <div class="middle-l">
+          <div class="cd-wrapper">
+            <div class="cd">
+              <img class="image" :src="currentSong.image">
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- 底部操作区 -->
+      <div class="bottom">
+        <div class="operators">
+          <div class="icon i-left">
+            <i class="icon-sequence"></i>
+          </div>
+          <div class="icon i-left">
+            <i class="icon-prev"></i>
+          </div>
+          <div class="icon i-center">
+            <i class="icon-play"></i>
+          </div>
+          <div class="icon i-right">
+            <i class="icon-next"></i>
+          </div>
+          <div class="icon i-right">
+            <i class="icon icon-not-favorite"></i>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="mini-player" v-show="!fullScreen"></div>
+    <!-- 迷你播放器 -->
+    <div class="mini-player" v-show="!fullScreen" @click="open">
+      <div class="icon">
+        <img width="40" height="40" :src="currentSong.image">
+      </div>
+      <div class="text">
+        <h2 class="name" v-html="currentSong.name"></h2>
+        <p class="desc" v-html="currentSong.singer"></p>
+      </div>
+      <div class="control"></div>
+      <div class="control">
+        <i class="icon-playlist"></i>
+      </div>
+    </div>
   </div>
 </template>
 <script>
-import { mapGetters } from "vuex";
+import { mapGetters, mapMutations } from "vuex";
 export default {
   computed: {
-    ...mapGetters(["fullScreen", "playList"])
+    ...mapGetters(["fullScreen", "playList", "currentSong"])
+  },
+  methods: {
+    /* 点击顶部返回按钮把mutations中的fullscreen改为false */
+    back() {
+      this.setFullScreen(false);
+    },
+    /* 点击迷你播放器把mutations中的fullscreen改为true */
+    open() {
+      this.setFullScreen(true);
+    },
+    ...mapMutations({
+      setFullScreen: "SET_FULL_SCREEN"
+    })
   }
 };
 </script>

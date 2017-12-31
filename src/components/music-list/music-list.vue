@@ -72,7 +72,6 @@ export default {
   methods: {
     scroll(pos) {
       this.scrollY = pos.y;
-      console.log(this.scrollY);
     },
     back() {
       this.$router.back();
@@ -82,7 +81,7 @@ export default {
       /* 设置当前 */
       this.selectPlay({
         list: this.songs,
-        index
+        index: index
       });
     },
     ...mapActions(["selectPlay"])

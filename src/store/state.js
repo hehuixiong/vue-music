@@ -11,6 +11,5 @@ const state = {
   /* 设置播放 */
   mode: playMode.sequence,
   currentIndex: -1, //维护播放
-
 }
 export default state
