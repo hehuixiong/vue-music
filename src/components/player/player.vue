@@ -22,7 +22,7 @@
         <div class="middle">
           <div class="middle-l">
             <div class="cd-wrapper" ref="cdWrapper"> 
-              <div class="cd">
+              <div class="cd" :class="cdCls">
                 <img class="image" :src="currentSong.image">
               </div>
             </div>
@@ -30,18 +30,27 @@
         </div>
         <!-- 底部操作区 -->
         <div class="bottom">
+          <div class="progress-wrapper">
+            <span class="time time-l">{{format(currentTime)}}</span>
+            <div class="progress-bar-wrapper">
+              <progress-bar :percent="percent"
+                @percentChange="onProgressBarChage">
+              </progress-bar>
+            </div>
+            <span class="time time-r">{{format(currentSong.duration)}}</span>
+          </div>
           <div class="operators">
             <div class="icon i-left">
               <i class="icon-sequence"></i>
             </div>
-            <div class="icon i-left">
-              <i class="icon-prev"></i>
+            <div class="icon i-left" :class="disableCls">
+              <i @click="prev" class="icon-prev"></i>
             </div>
-            <div class="icon i-center">
-              <i class="icon-play"></i>
+            <div class="icon i-center" :class="disableCls">
+              <i :class="playIcon" @click="togglePlaying"></i>
             </div>
-            <div class="icon i-right">
-              <i class="icon-next"></i>
+            <div class="icon i-right" :class="disableCls">
+              <i @click="next" class="icon-next"></i>
             </div>
             <div class="icon i-right">
               <i class="icon icon-not-favorite"></i>
@@ -54,28 +63,70 @@
     <transition name="mini">
       <div class="mini-player" v-show="!fullScreen" @click="open">
         <div class="icon">
-          <img width="40" height="40" :src="currentSong.image">
+          <img :class="cdCls" width="40" height="40" :src="currentSong.image">
         </div>
         <div class="text">
           <h2 class="name" v-html="currentSong.name"></h2>
           <p class="desc" v-html="currentSong.singer"></p>
         </div>
-        <div class="control"></div>
+        <div class="control">
+          <!-- click.stop阻止事件冒泡 -->
+          <i :class="miniIcon" @click.stop="togglePlaying"></i>
+        </div>
         <div class="control">
           <i class="icon-playlist"></i>
         </div>
       </div>
     </transition>
+    <!-- canplay可以播放 -->
+    <!-- error检测不到url的时候 -->
+    <audio ref="audio" :src="currentSong.url" @canplay="ready" 
+    @error="error" @timeupdate="updateTime"></audio>
   </div>
 </template>
 <script>
 import { mapGetters, mapMutations } from "vuex";
 import animations from "create-keyframe-animation";
 import { prefixStyle } from "common/js/dom";
+import ProgressBar from "base/progress-bar/progress-bar";
 const transform = prefixStyle("transform");
 export default {
+  components: {
+    ProgressBar
+  },
+  data() {
+    return {
+      songReady: false, //控制加载完毕在播放
+      currentTime: 0 // 当前时间
+    };
+  },
   computed: {
-    ...mapGetters(["fullScreen", "playList", "currentSong"])
+    /* 控制cd旋转的样式 */
+    cdCls() {
+      return this.playing ? "play" : "play pause";
+    },
+    /* 控制播放暂停的样式 */
+    playIcon() {
+      return this.playing ? "icon-pause" : "icon-play";
+    },
+    /* 控制迷你播放暂停样式 */
+    miniIcon() {
+      return this.playing ? "icon-pause-mini" : "icon-play-mini";
+    },
+    disableCls() {
+      return this.songReady ? "" : "disable";
+    },
+    percent() {
+      /* 当前时间除以总时长 */
+      return this.currentTime / this.currentSong.duration;
+    },
+    ...mapGetters([
+      "fullScreen",
+      "playList",
+      "currentSong",
+      "playing",
+      "currentIndex"
+    ])
   },
   methods: {
     /* 点击顶部返回按钮把mutations中的fullscreen改为false */
@@ -144,9 +195,104 @@ export default {
         scale
       };
     },
+    /* 歌曲加载成功执行 */
+    ready() {
+      this.songReady = true;
+    },
+    /* 网络异常或者下一首歌曲不存在执行 */
+    error() {
+      this.songReady = true;
+    },
+    updateTime(e) {
+      this.currentTime = e.target.currentTime;
+    },
+    /* 时间戳 */
+    format(interval) {
+      interval = interval | 0; // 或0等于上下取整
+      const minute = (interval / 60) | 0;
+      const second = this._pad(interval % 60);
+      return `${minute}:${second}`;
+    },
+    onProgressBarChage(percent) {
+      this.$refs.audio.currentTime = this.currentSong.duration * percent;
+      // 拖动的时候如果没有播放，就播放
+      if (!this.playing) {
+        this.togglePlaying();
+      }
+    },
+    /* 补零 */
+    _pad(num, n = 2) {
+      let len = num.toString().length;
+      while (len < n) {
+        num = "0" + num;
+        len++;
+      }
+      return num;
+    },
+    /* 上一首 */
+    prev() {
+      // 如果没有加载完毕执行
+      if (!this.songReady) {
+        return;
+      }
+      let index = this.currentIndex - 1;
+      if (index === -1) {
+        index = this.playList.length - 1;
+      }
+      this.setCurrentIndex(index);
+      /* 如果此时的playing是播放的，让其变成暂停 */
+      if (!this.playing) {
+        this.togglePlaying();
+      }
+      this.songReady = false;
+    },
+    /* 下一首 */
+    next() {
+      // 如果没有加载完毕执行
+      if (!this.songReady) {
+        return;
+      }
+      let index = this.currentIndex + 1;
+      /* 判断如何播放到最后一首歌的时候，跳回第一首 */
+      if (index === this.playList.length) {
+        index = 0;
+      }
+      this.setCurrentIndex(index);
+      /* 如果此时的playing是暂停的，让其变成播放 */
+      if (!this.playing) {
+        this.togglePlaying();
+      }
+      this.songReady = false;
+    },
+    /* 控制暂停播放歌曲 */
+    togglePlaying() {
+      // 如果没有加载完毕执行
+      if (!this.songReady) {
+        return;
+      }
+      this.setPalyingState(!this.playing);
+    },
     ...mapMutations({
-      setFullScreen: "SET_FULL_SCREEN"
+      setFullScreen: "SET_FULL_SCREEN",
+      setPalyingState: "SET_PLAYING_STATE",
+      setCurrentIndex: "SET_CURRENT_INDEX"
     })
+  },
+  watch: {
+    /* 当currentSong发生改变的时候播放歌曲 */
+    currentSong() {
+      // 加一个延时
+      this.$nextTick(() => {
+        this.$refs.audio.play();
+      });
+    },
+    /* 监听播放暂停 */
+    playing(newPlaying) {
+      const audio = this.$refs.audio;
+      this.$nextTick(() => {
+        newPlaying ? audio.play() : audio.pause();
+      });
+    }
   }
 };
 </script>
